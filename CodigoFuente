@@ -1,0 +1,173 @@
+#include <SPI.h>
+#include <WiFiNINA.h>
+#include <DHT.h>
+
+
+
+
+const char* ssid = "NullBot Network"; // CHANGE INTO YOUR NETWORK NAME
+const char* password = "ROB-Sss5s65"; // CHANGE INTO YOUR SECRET PASSWORD
+
+// Configuración de la IP estática.
+    IPAddress local_IP(10,0,0,21);// CHANGE INTO YOUR IP ADDRESS
+    IPAddress gateway(10,0,0,1);    
+    IPAddress subnet(255, 255, 255, 0); 
+
+int LED6=  6;    // LED en terminal 5
+int LED7=  7;    // LED en terminal 6
+
+// Definimos el pin digital donde se conecta el sensor de temperatura y humnedad
+#define DHTPIN 2
+// Dependiendo del tipo de sensor
+#define DHTTYPE DHT11
+ 
+// Inicializamos el sensor DHT11
+DHT dht(DHTPIN, DHTTYPE);
+float h = 0;
+float t = 0;
+
+WiFiServer server(80);
+ 
+void setup() {
+  Serial.begin(9600);
+  dht.begin();
+  pinMode(LED6, OUTPUT);
+  pinMode(LED7, OUTPUT);
+  
+// Establecimiento de la IP estática.
+   WiFi.config(local_IP, gateway, subnet);
+  delay(5000);
+// Conecta a la red wifi.
+  
+  Serial.print("Conectando con ");
+  Serial.println(ssid);
+ 
+  WiFi.begin(ssid, password);
+ 
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("Conectado con WiFi.");
+ 
+  // Inicio del Servidor web.
+  server.begin();
+  Serial.println("Servidor web iniciado.");
+ 
+  // Esta es la IP
+  Serial.print("Esta es la IP para conectar: ");
+  Serial.print("http://");
+  Serial.println(WiFi.localIP());
+}
+ 
+void loop() {
+
+
+  delay(500);
+  
+  // Consulta si se ha conectado algún cliente.
+  WiFiClient client = server.available();
+  if (!client) {
+    return;
+  }
+
+  Serial.print("Nuevo cliente: ");
+  Serial.println(client.remoteIP());
+
+  // Espera hasta que el cliente envíe datos.
+  while(!client.available()){ delay(1); }
+
+  /////////////////////////////////////////////////////
+  // Lee la información enviada por el cliente.
+  String req = client.readStringUntil('\r');
+  Serial.println(req);
+  
+  // Realiza la petición del cliente.
+       if (req.indexOf("bombillason") != -1) 
+       {
+        digitalWrite(LED7, HIGH);
+         digitalWrite(LED6, LOW);
+        client.println("HTTP/1.1 200 OK");
+        client.println("Content-Type: text/html");
+        client.println(""); //  Importante.
+        return;
+       }
+       
+       if (req.indexOf("bombillasoff") != -1) 
+       {
+        digitalWrite(LED7, LOW);
+        client.println("HTTP/1.1 200 OK");
+        client.println("Content-Type: text/html");
+        client.println(""); //  Importante.
+        return;
+       }
+
+       if (req.indexOf("ventiladoron") != -1) 
+       {
+        digitalWrite(LED6, HIGH);
+        digitalWrite(LED7, LOW);
+        client.println("HTTP/1.1 200 OK");
+        client.println("Content-Type: text/html");
+        client.println(""); //  Importante.
+        return;
+       }
+       
+       if (req.indexOf("ventiladoroff") != -1) 
+       {
+        digitalWrite(LED6, LOW);
+        client.println("HTTP/1.1 200 OK");
+        client.println("Content-Type: text/html");
+        client.println(""); //  Importante.
+        return;
+       }
+
+       
+       if (req.indexOf("gettemp") != -1) 
+        {
+
+          
+          float h_tmp = dht.readHumidity();
+          float t_tmp = dht.readTemperature(); 
+  
+
+          do {
+          h_tmp = dht.readHumidity();
+          t_tmp = dht.readTemperature();          
+          delay(500);
+          } while (isnan(t_tmp) || isnan(h_tmp));
+          t = t_tmp;
+          h = h_tmp;
+
+
+          
+          client.println("HTTP/1.1 200 OK");
+          client.println("Content-Type: text/html");
+          client.println(""); //  IMPORTANT
+          client.println("<!DOCTYPE HTML>");
+          client.println("<html>");          
+          client.println("/");
+
+          client.println(round(t));    
+          client.println("/"); 
+          client.println(h); 
+          client.println(""); //  Importante.             
+
+          return;
+        }
+
+
+
+       
+   
+
+  //////////////////////////////////////////////
+  // Página WEB. ////////////////////////////
+
+
+    Serial.print("Cliente desconectado: ");
+    //println(client.remoteIP());
+    client.flush();
+    client.stop(); 
+    return;  
+  
+}
